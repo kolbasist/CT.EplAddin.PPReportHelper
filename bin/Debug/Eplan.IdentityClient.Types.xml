@@ -1,0 +1,396 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Eplan.IdentityClient.Types</name>
+    </assembly>
+    <members>
+        <member name="T:Eplan.IdentityClient.BindingRedirectAssemblyResolver">
+            <summary>
+            BindingRedirectAssemblyResolver
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.BindingRedirectAssemblyResolver.#ctor">
+            <summary>
+            BindingRedirectAssemblyResolver ctr
+            </summary>
+        </member>
+        <member name="T:Eplan.IdentityClient.IdentityClientResponse">
+            <summary>
+            IdentityClientResponse class contains response data.
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.IdentityClientResponse.#ctor">
+            <summary>
+            IdentityClientResponse constructor.
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.IdentityClientResponse.#ctor(Eplan.IdentityClient.IdentityClientResponse)">
+            <summary>
+            IdentityClientResponse constructor sets response data from existing object.
+            </summary>
+            <param name="data">IdentityClientResponse object with data to be set.</param>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.DisplayName">
+            <summary>DisplayName.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.Email">
+            <summary>User Email address.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.OrganizationName">
+            <summary>Organization name.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.Message">
+            <summary>Message.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.Error">
+            <summary>Error message.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.Cookies">
+            <summary>Cookies.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.IdentityServiceUrl">
+            <summary>IdentityClient service URL.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.ConfigurationServiceUrl">
+            <summary>IdentityClient configuration service URL.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.ConfigurationServiceApiVersion">
+            <summary>IdentityClient configuration service API version.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.Environment">
+            <summary>Environment information.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.AccessToken">
+            <summary>Access token value.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.RefreshToken">
+            <summary>Refresh token.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.StatusCode">
+            <summary>IdentityStatusCode success code.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.IdentityClientResponse.IsSuccess">
+            <summary>Indicates if IdentityStatusCode is success.</summary>
+        </member>
+        <member name="T:Eplan.IdentityClient.AuthenticationData">
+            <summary>
+            AuthenticationData class contains useful authentication data.
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.AuthenticationData.#ctor">
+            <summary>
+            AuthenticationData constructor.
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.AuthenticationData.#ctor(Eplan.IdentityClient.AuthenticationData)">
+            <summary>
+            AuthenticationData constructor sets authentication data from existing object.
+            </summary>
+            <param name="data">AuthenticationData object with data to be set.</param>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.ClientId">
+            <summary>Service ClientId name.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.AuthenticationTime">
+            <summary>Authentication date and time.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.GracePeriodStartTime">
+            <summary>Date and time of grace period start.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.IdentityToken">
+            <summary>IdentityClient token.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.Sub">
+            <summary>EPLAN Cloud user ID in the IdentityService.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.OrganizationId">
+            <summary>EPLAN Cloud user organization ID.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.OrganizationUserId">
+            <summary>EPLAN Cloud user ID in the organization.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.AccessTokenExpiration">
+            <summary>Date and time of access token expiration.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.AuthenticationData.ManagementServiceUrl">
+            <summary>Management service URL.</summary>
+        </member>
+        <member name="T:Eplan.IdentityClient.Authentication.IAuthentication">
+            <summary>
+            IAuthentication interface for authentication
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentication.IAuthentication.InitIdentityClient(System.String,Eplan.IdentityClient.ApplicationMode,System.String,System.String)">
+            <summary>
+            Initializes IdentityClient object.         
+            </summary>
+            <param name="strMainClientId">Application main ClientId name. Ex. DesktopPlatformWithConsents, HarnessProD</param>
+            <param name="mode">Interactive (with UI) or Batch application mode.</param>
+            <param name="strLocale">Language, e.g. "en-US" or "de-DE".</param>
+            <param name="strScopes">For internal use (parameter is set automatically).</param>
+            <remarks>
+            Used when authenticate from outside of EPLAN application environment.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentication.IAuthentication.ExitAuthentication">
+            <summary>
+            Exits from Authentication.
+            </summary>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentication.IAuthentication.SetProxy(Eplan.IdentityClient.EProxySettings)">
+            <summary>
+            Sets custom proxy connection configuration.         
+            </summary>
+            <param name="proxySettings">Proxy settings object.</param>
+            <remarks>
+            If not used, by default system proxy settings will be applied.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentication.IAuthentication.Signin">
+            <summary>
+            Signs in to EPLAN Cloud. 
+            </summary>
+            <remarks>
+            If not already signed in, a login window will pop out. 
+            </remarks>
+            <returns>AuthenticationData: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentication.IAuthentication.Signout">
+            <summary>
+            Signs out from EPLAN Cloud.
+            </summary>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentication.IAuthentication.GetUserProfile">
+            <summary>
+            Gets EPLAN cloud user profile information.        
+            </summary>
+            <remarks>
+            The returned CloudUserProfile object contains information such as DisplayName, OrganizationName, Email etc.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentication.IAuthentication.GetHttpClient(System.String,System.String,System.Net.Http.HttpClient@)">
+            <summary>
+            Gets HttpClient object.
+            IHttpClientFactory is used internally to create the HttpClient object.
+            </summary>
+            <param name="strClientId">ClientId name.</param>
+            <param name="url">URL for which a proxy object will be created and set in the HttpClient object.</param>
+            <param name="httpClient">Valid HttpClient object if success, otherwise null.</param>
+            <remarks>
+            A proxy for the baseAddress and the authorization header to access the EPLAN Cloud service (strClientId) are set by default in the
+            returned HttpClient object. In this way it is ready for use.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="T:Eplan.IdentityClient.Management.ITokenManagment">
+            <summary>
+            ITokenManagment Interface
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.Management.ITokenManagment.InitTokenManagement(System.String,System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            InitTokenManagement
+            </summary>
+            <param name="strMainClientId">MainClientId</param>
+            <param name="strAccessToken">AccessToken</param>
+            <param name="strRefreshToken">RefreshToken</param>
+            <param name="strIdentityServiceUrl">IdentityService Url</param>
+            <param name="strLocale">Language, e.g. "en-US" or "de-DE".</param>
+            <param name="strScopes">Scopes. For internal use (parameter is set automatically).</param>
+            <returns></returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Management.ITokenManagment.ExitTokenManagement">
+            <summary>
+            Exits Token Management.
+            </summary>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Management.ITokenManagment.RegisterClientId(System.String)">
+            <summary>
+            Registers ClientId in service.        
+            </summary>
+            <param name="clientId">ClientId name.</param>
+            <remarks>
+            By calling this method the internal TokenManagement will know about the client and manage access token for it. <br/>
+            After calling this method, one can utilize the method GetAccessToken or GetHttpClient for the registered client. <br/>
+            Method called also internally by GetHttpClient() method.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Management.ITokenManagment.GetAccessToken(System.String)">
+            <summary>
+            Gets access token for a ClientId. 
+            </summary>
+            <param name="clientId">ClientId name.</param>
+            <remarks>
+            Method called also internally by GetHttpClient() method.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="T:Eplan.IdentityClient.Shared">
+            <summary>
+            Shared utility types
+            </summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.Shared._licenseProgramRoot">
+            <summary>
+             license client ProgramRoot
+            </summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.Shared.IdentityClientProgramRoot">
+            <summary>
+            IdentityClient ProgramRoot 
+            </summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.Shared.LicenseProgramRoot">
+            <summary>
+            License client ProgramRoot
+            </summary>
+        </member>
+        <member name="T:Eplan.IdentityClient.ApplicationMode">
+            <summary>
+            Available application modes.
+            </summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.ApplicationMode.Interactive">
+            <summary>Interactive mode with UI.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.ApplicationMode.Batch">
+            <summary>Batch mode.</summary>
+        </member>
+        <member name="T:Eplan.IdentityClient.IdentityStatusCode">
+            <summary>
+            Available response status codes.
+            </summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.Failed">
+            <summary>Call failed, potential problems: time out, wrong credentials, canceled.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.Success">
+            <summary>Call success.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.Offline">
+            <summary>Offline mode.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.SignInRequired">
+            <summary>If a grace period has expired, a sign in is required.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.NoAuthentication">
+            <summary>Authentication not performed. Was not needed, i.e. automation processes.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.ConnectionError">
+            <summary>Connection error.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.UnknownError">
+            <summary>Unknown error.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.ClientError">
+            <summary>Client error.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.ServerError">
+            <summary>Server error.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.IdentityClientNotInitialized">
+            <summary>IdentityClient not initialized.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.UnknownException">
+            <summary>Unknown exception.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.TimeOut">
+            <summary>Connection time out.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.MemoryMappedFileCreationFailed">
+            <summary>Memory mapped file creation failed.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.MutexCreationFailed">
+            <summary>Mutex creation failed.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.WriteDataIntoSharedMemoryFailed">
+            <summary>Write data into shared memory failed.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.ReadDataFromSharedMemoryFailed">
+            <summary>Read data from shared memory failed.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.UnexpectedException">
+            <summary>Unexpected exception.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.UnsupportedCall">
+            <summary>Unsupported call.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.IdentityClientProcessCreationFailed">
+            <summary>IdentityClient process creation failed.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.IdentityClientProcessCallFailed">
+            <summary>IdentityClient process call failed.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.InvalidSharedMemoryData">
+            <summary>Invalid shared memory data.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.UserProfileError">
+            <summary>User profile error.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.AuthenticationInterfaceCouldNotBeInitialized">
+            <summary>Authentication interface could not be initialized.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.TokenManagementInterfaceCouldNotBeInitialized">
+            <summary>Token management interface could not be initialized.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.ClientIdNotRegistered">
+            <summary>ClientId not registered.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.AuthDataEmpty">
+            <summary>Authentication data is empty.</summary>
+        </member>
+        <member name="F:Eplan.IdentityClient.IdentityStatusCode.InitCefFailed">
+            <summary>Certificate initialization failed.</summary>
+        </member>
+        <member name="T:Eplan.IdentityClient.EProxySettings">
+            <summary>
+            Proxy configuration class. 
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.EProxySettings.#ctor">
+            <summary>
+            EProxySettings constructor.
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.EProxySettings.#ctor(Eplan.IdentityClient.EProxySettings)">
+            <summary>
+            EProxySettings constructor sets proxy configuration from existing object.
+            </summary>
+            <param name="proxyConfig">EProxySettings object with configuration to be set.</param>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.Active">
+            <summary>Indicates if proxy is active. Default = false.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.UseSystemProxy">
+            <summary>Indicates if system proxy is used. Default = true.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.Address">
+            <summary>IP address. Default = empty.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.Port">
+            <summary>Port number. Default = -1.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.User">
+            <summary>User name. Default = empty.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.Password">
+            <summary>Password. Default = empty.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.PasswordEncrypted">
+            <summary>Encrypted password. Default = empty.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.Domain">
+            <summary>Domain name. Default = empty.</summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.EProxySettings.ScriptAddress">
+            <summary>Script address. Default = empty.</summary>
+        </member>
+    </members>
+</doc>

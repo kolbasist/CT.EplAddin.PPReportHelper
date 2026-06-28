@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Eplan.IdentityClient.Authentification</name>
+    </assembly>
+    <members>
+        <member name="T:Eplan.IdentityClient.Authentification.EIdentityClient">
+            <summary>
+            IdentityClient requires loading dlls from %programfiles%\eplan\common\identityClient 
+            we have to provide them manually via <see cref="!:AppDomain.CurrentDomain.AssemblyResolve"/>
+            </summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.Authentification.EIdentityClient.Instance">
+            <summary>
+            EIdentityClient Instance
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.InitIdentityClient(System.String,Eplan.IdentityClient.ApplicationMode,System.String,System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.Exit">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.SetProxy(Eplan.IdentityClient.EProxySettings)">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.Signin">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.Signout">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.GetUserProfile">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.RegisterClientId(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.GetAccessToken(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.GetHttpClient(System.String,System.String,System.Net.Http.HttpClient@)">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.SetProductInfo(Eplan.IdentityClient.Authentification.ProductInfo,System.Collections.Generic.Dictionary{System.String,System.String})">
+            <inheritdoc />
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.EIdentityClient.SendProductInfoToEic(System.Collections.Generic.Dictionary{System.String,System.String})">
+             private
+            
+        </member>
+        <member name="T:Eplan.IdentityClient.Authentification.ProductInfo">
+            <summary>
+            ProductInfo
+            </summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.Authentification.ProductInfo.ProductName">
+            <summary>
+            ProductName
+            </summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.Authentification.ProductInfo.ProductVariant">
+            <summary>
+            ProductVariant
+            </summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.Authentification.ProductInfo.ProductVersion">
+            <summary>
+            ProductVersion. This should include also the buildNumber.
+            </summary>
+        </member>
+        <member name="P:Eplan.IdentityClient.Authentification.ProductInfo.LicenseClientVersion">
+            <summary>
+            License Client Version
+            </summary>
+        </member>
+        <member name="T:Eplan.IdentityClient.Authentification.IEIdentityClient">
+            <summary>
+            Interface for Eplan.IdentityClient.Authentification namespace.
+            </summary>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.InitIdentityClient(System.String,Eplan.IdentityClient.ApplicationMode,System.String,System.String)">
+            <summary>
+            Initializes IdentityClient object.         
+            </summary>
+            <param name="strMainClientId">Application main ClientId name. E.g. DesktopPlatformWithConsents, HarnessProD</param>
+            <param name="mode">Interactive (with UI) or Batch application mode.</param>
+            <param name="strLocale">Language, e.g. "en-US" or "de-DE".</param>
+            <param name="strScopes">For internal use (parameter is set automatically).</param>
+            <remarks>
+            Used when authenticate from outside of EPLAN application environment.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.Exit">
+            <summary>
+            Exits from IdentityClient.
+            </summary>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.SetProxy(Eplan.IdentityClient.EProxySettings)">
+            <summary>
+            Sets custom proxy connection configuration.         
+            </summary>
+            <param name="proxySettings">Proxy settings object.</param>
+            <remarks>
+            If not used, the system proxy settings are used by default.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.Signin">
+            <summary>
+            Signs in to EPLAN Cloud. 
+            </summary>
+            <remarks>
+            If not already signed in, a login window will pop out. 
+            </remarks>
+            <returns>AuthenticationData: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.Signout">
+            <summary>
+            Signs out from EPLAN Cloud.
+            </summary>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.GetUserProfile">
+            <summary>
+            Gets EPLAN cloud user profile information.        
+            </summary>
+            <remarks>
+            The returned CloudUserProfile object contains information such as DisplayName, OrganizationName, Email etc.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.RegisterClientId(System.String)">
+            <summary>
+            Registers ClientId of an EPLAN Cloud service.        
+            </summary>
+            <param name="strClientId">ClientId name.</param>
+            <remarks>
+            By calling this method the internal TokenManagement will know about the client and manage access token for it. <br/>
+            After calling this method, one can utilize the method GetAccessToken or GetHttpClient for the registered client. <br/>
+            Method called also internally by GetHttpClient() method.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.GetAccessToken(System.String)">
+            <summary>
+            Gets access token for a ClientId. 
+            </summary>
+            <param name="strClientId">ClientId name.</param>
+            <remarks>
+            Method called also internally by GetHttpClient() method.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.GetHttpClient(System.String,System.String,System.Net.Http.HttpClient@)">
+            <summary>
+            Gets HttpClient object.
+            IHttpClientFactory is used internally to create the HttpClient object.
+            </summary>
+            <param name="strClientId">ClientId name.</param>
+            <param name="url">URL for which a proxy object will be created and set in the HttpClient object.</param>
+            <param name="httpClient">Valid HttpClient object if success, otherwise null.</param>
+            <remarks>
+            A proxy for the baseAddress and the authorization header to access the EPLAN Cloud service (strClientId) are set by default in the
+            returned HttpClient object. In this way it is ready for use.
+            </remarks>
+            <returns>IdentityClientResponse: operation result.</returns>
+        </member>
+        <member name="M:Eplan.IdentityClient.Authentification.IEIdentityClient.SetProductInfo(Eplan.IdentityClient.Authentification.ProductInfo,System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Sets product information
+            </summary>
+            <param name="productInfo">Product Information</param>
+            <param name="additionalProductInfo">Additional Product Information</param>
+            <returns>true if product information could be sent to the IdentityClient. Otherwise false.</returns>
+        </member>
+    </members>
+</doc>
