@@ -1,7 +1,9 @@
-﻿using System;
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Eplan.EplApi.Base;
 using Eplan.EplApi.DataModel;
 
@@ -10,6 +12,28 @@ namespace CT.Epladdin.PPReportHelper
     internal static class MultiLangStringTextExtractor
     {
         private const string UndefinedLanguageCode = "??_??";
+
+        private static readonly Regex LanguageRecordPrefixRegex =
+            new Regex(
+                @"(^|[;\r\n])\s*(?<language>(L_)?([A-Za-z]{2}[_-][A-Za-z]{2}|\?\?_\?\?|___|____))\s*[@:=\t]",
+                RegexOptions.Compiled);
+
+        private sealed class LanguageTextSegment
+        {
+            internal string LanguageCode { get; private set; }
+            internal string Text { get; private set; }
+
+            internal LanguageTextSegment(
+                string languageCode,
+                string text)
+            {
+                LanguageCode =
+                    NormalizeLanguageCode(languageCode);
+
+                Text =
+                    NormalizeLanguageSegmentText(text);
+            }
+        }
 
         internal static string GetProjectLanguageText(
             MultiLangString multiLangString,
@@ -31,7 +55,9 @@ namespace CT.Epladdin.PPReportHelper
                     projectLanguageCode,
                     out result))
             {
-                return Normalize(result);
+                return ExtractTextFromSerializedLanguageString(
+                    result,
+                    projectLanguageCode);
             }
 
             if (TryGetTextForLanguageCode(
@@ -39,35 +65,71 @@ namespace CT.Epladdin.PPReportHelper
                     UndefinedLanguageCode,
                     out result))
             {
-                return Normalize(result);
+                return ExtractTextFromSerializedLanguageString(
+                    result,
+                    UndefinedLanguageCode);
             }
 
             string raw =
                 Normalize(multiLangString.GetAsString());
+
+            return ExtractTextFromSerializedLanguageString(
+                raw,
+                projectLanguageCode);
+        }
+
+        internal static string GetProjectLanguageTextFromSerializedString(
+            string value,
+            Project project)
+        {
+            string projectLanguageCode =
+                GetProjectLanguageCode(project);
+
+            return ExtractTextFromSerializedLanguageString(
+                value,
+                projectLanguageCode);
+        }
+
+        internal static string NormalizeTextForPropertyGrid(
+            string value)
+        {
+            string raw =
+                Normalize(value);
 
             if (string.IsNullOrWhiteSpace(raw))
             {
                 return string.Empty;
             }
 
-            if (!string.IsNullOrWhiteSpace(projectLanguageCode) &&
-                TryExtractLanguageLine(
-                    raw,
-                    projectLanguageCode,
-                    out result))
+            List<LanguageTextSegment> segments =
+                ExtractLanguageTextSegments(raw);
+
+            if (segments.Count > 0)
             {
-                return Normalize(result);
+                LanguageTextSegment undefinedSegment =
+                    FindSegmentByLanguageCode(
+                        segments,
+                        UndefinedLanguageCode);
+
+                if (undefinedSegment != null &&
+                    !string.IsNullOrWhiteSpace(undefinedSegment.Text))
+                {
+                    return undefinedSegment.Text;
+                }
+
+                LanguageTextSegment firstNonEmptySegment =
+                    segments.FirstOrDefault(
+                        segment =>
+                            segment != null &&
+                            !string.IsNullOrWhiteSpace(segment.Text));
+
+                return firstNonEmptySegment == null
+                    ? string.Empty
+                    : firstNonEmptySegment.Text;
             }
 
-            if (TryExtractLanguageLine(
-                    raw,
-                    UndefinedLanguageCode,
-                    out result))
-            {
-                return Normalize(result);
-            }
-
-            return StripFirstKnownLanguagePrefix(raw);
+            return NormalizeLanguageSegmentText(
+                StripFirstKnownLanguagePrefix(raw));
         }
 
         internal static string Normalize(
@@ -76,6 +138,159 @@ namespace CT.Epladdin.PPReportHelper
             return (value ?? string.Empty)
                 .Replace("\r\n", "\n")
                 .Trim();
+        }
+
+        private static string ExtractTextFromSerializedLanguageString(
+            string raw,
+            string projectLanguageCode)
+        {
+            raw =
+                Normalize(raw);
+
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return string.Empty;
+            }
+
+            List<LanguageTextSegment> segments =
+                ExtractLanguageTextSegments(raw);
+
+            if (segments.Count == 0)
+            {
+                return NormalizeTextForPropertyGrid(raw);
+            }
+
+            LanguageTextSegment projectSegment =
+                FindSegmentByLanguageCode(
+                    segments,
+                    projectLanguageCode);
+
+            if (projectSegment != null &&
+                !string.IsNullOrWhiteSpace(projectSegment.Text))
+            {
+                return projectSegment.Text;
+            }
+
+            LanguageTextSegment undefinedSegment =
+                FindSegmentByLanguageCode(
+                    segments,
+                    UndefinedLanguageCode);
+
+            if (undefinedSegment != null &&
+                !string.IsNullOrWhiteSpace(undefinedSegment.Text))
+            {
+                return undefinedSegment.Text;
+            }
+
+            LanguageTextSegment firstNonEmptySegment =
+                segments
+                    .FirstOrDefault(
+                        segment =>
+                            segment != null &&
+                            !string.IsNullOrWhiteSpace(segment.Text));
+
+            return firstNonEmptySegment == null
+                ? string.Empty
+                : firstNonEmptySegment.Text;
+        }
+
+        private static LanguageTextSegment FindSegmentByLanguageCode(
+            IEnumerable<LanguageTextSegment> segments,
+            string languageCode)
+        {
+            if (segments == null ||
+                string.IsNullOrWhiteSpace(languageCode))
+            {
+                return null;
+            }
+
+            string normalizedLanguageCode =
+                NormalizeLanguageCode(languageCode);
+
+            return segments.FirstOrDefault(
+                segment =>
+                    segment != null &&
+                    string.Equals(
+                        segment.LanguageCode,
+                        normalizedLanguageCode,
+                        StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static List<LanguageTextSegment> ExtractLanguageTextSegments(
+            string raw)
+        {
+            List<LanguageTextSegment> result =
+                new List<LanguageTextSegment>();
+
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return result;
+            }
+
+            MatchCollection matches =
+                LanguageRecordPrefixRegex.Matches(raw);
+
+            if (matches == null || matches.Count == 0)
+            {
+                return result;
+            }
+
+            for (int index = 0; index < matches.Count; index++)
+            {
+                Match match =
+                    matches[index];
+
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                string languageCode =
+                    match.Groups["language"].Value;
+
+                int valueStartIndex =
+                    match.Index + match.Length;
+
+                int valueEndIndex =
+                    index + 1 < matches.Count
+                        ? matches[index + 1].Index
+                        : raw.Length;
+
+                if (valueEndIndex < valueStartIndex)
+                {
+                    continue;
+                }
+
+                string value =
+                    raw.Substring(
+                        valueStartIndex,
+                        valueEndIndex - valueStartIndex);
+
+                result.Add(
+                    new LanguageTextSegment(
+                        languageCode,
+                        value));
+            }
+
+            return result;
+        }
+
+        private static string NormalizeLanguageSegmentText(
+            string value)
+        {
+            string result =
+                Normalize(value);
+
+            while (result.EndsWith(";", StringComparison.Ordinal))
+            {
+                result =
+                    Normalize(
+                        result.Substring(
+                            0,
+                            result.Length - 1));
+            }
+
+            return result;
         }
 
         private static string GetProjectLanguageCode(
@@ -447,26 +662,31 @@ namespace CT.Epladdin.PPReportHelper
                 return string.Empty;
             }
 
-            string firstLine =
-                text.Split('\n').FirstOrDefault() ?? text;
-
+            /*
+             * Важно: не режем строку по первому \n.
+             * Заголовки столбцов штатно могут быть многострочными:
+             * "№\nп/п", "Обозначение\nвентустановки" и т. п.
+             * Здесь нужно только снять возможный языковой префикс в начале
+             * всей строки, сохранив остальные переводы строк.
+             */
             int separatorIndex =
-                FindFirstSeparatorIndex(firstLine);
+                FindFirstSeparatorIndex(text);
 
             if (separatorIndex <= 0)
             {
-                return firstLine;
+                return text;
             }
 
             string possibleLanguage =
-                firstLine.Substring(0, separatorIndex).Trim();
+                text.Substring(0, separatorIndex).Trim();
 
             if (LooksLikeLanguageCode(possibleLanguage))
             {
-                return Normalize(firstLine.Substring(separatorIndex + 1));
+                return Normalize(
+                    text.Substring(separatorIndex + 1));
             }
 
-            return firstLine;
+            return text;
         }
 
         private static int FindFirstSeparatorIndex(

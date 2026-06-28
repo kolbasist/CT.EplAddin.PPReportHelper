@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using Eplan.EplApi.Base;
 
@@ -36,7 +36,7 @@ namespace CT.Epladdin.PPReportHelper
 
         [Category("Таблица")]
         [Description("Заголовок таблицы")]
-        public string TITLE { get; set; } = "Перечень функциональных зон";
+        public string TITLE { get; set; } = string.Empty;
 
         [Category("Заголовки столбцов")]
         public string NUMBER_HEADER { get; set; } = "№\nп/п";
@@ -256,14 +256,22 @@ namespace CT.Epladdin.PPReportHelper
             {
                 if (settings.ExistSetting(key))
                 {
-                    return settings.GetStringSetting(key, 0);
+                    return NormalizeSettingsString(
+                        settings.GetStringSetting(key, 0));
                 }
             }
             catch
             {
             }
 
-            return defaultValue ?? string.Empty;
+            return NormalizeSettingsString(defaultValue);
+        }
+
+        private static string NormalizeSettingsString(
+            string value)
+        {
+            return MultiLangStringTextExtractor.NormalizeTextForPropertyGrid(
+                value);
         }
 
         private static double GetDouble(
@@ -291,7 +299,7 @@ namespace CT.Epladdin.PPReportHelper
             string value)
         {
             value =
-                value ?? string.Empty;
+                NormalizeSettingsString(value);
 
             if (!settings.ExistSetting(key))
             {

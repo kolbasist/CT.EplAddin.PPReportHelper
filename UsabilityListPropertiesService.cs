@@ -21,6 +21,9 @@ namespace CT.Epladdin.PPReportHelper
             UsabilityList list =
                 new UsabilityList(block);
 
+            list.RefreshCurrentPropertiesFromBlockGraphics();
+            list.RefreshOriginFromBlockLocation();
+
             if (!list.HasData)
             {
                 list.TryReloadDataFromActivePage();

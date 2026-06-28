@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -18,6 +18,15 @@ namespace CT.Epladdin.PPReportHelper
 {
     internal sealed class UsabilityList
     {
+        public enum UsabilityListSortingMode
+        {
+            MountingPlaceThenDesignation,
+            DesignationThenMountingPlace,
+            DescriptionThenMountingPlaceThenDesignation,
+            DescriptionThenDesignationThenMountingPlace,
+            None
+        }
+
         internal const string TableMarkerPrefix = "CT_USABILITY_LIST#";
 
         private const string StateTextPrefix = "CT_USABILITY_LIST_STATE|";
@@ -47,22 +56,29 @@ namespace CT.Epladdin.PPReportHelper
         public string TABLE_TITLE
         {
             get { return Title; }
-            set { Title = value ?? string.Empty; }
+            set { Title = NormalizeTableText(value); }
         }
 
         [Category("Положение")]
+        [ReadOnly(true)]
+        [Description("Текущая координата X верхнего левого угла таблицы. Значение вычисляется по размещённому блоку и не редактируется вручную.")]
         public double ORIGIN_X
         {
             get { return OriginX; }
-            set { OriginX = value; }
         }
 
         [Category("Положение")]
+        [ReadOnly(true)]
+        [Description("Текущая координата Y верхнего левого угла таблицы. Значение вычисляется по размещённому блоку и не редактируется вручную.")]
         public double ORIGIN_Y
         {
             get { return OriginY; }
-            set { OriginY = value; }
         }
+
+        [Category("Сортировка")]
+        [Description("Порядок сортировки строк таблицы применимости.")]
+        public UsabilityListSortingMode SortingBy { get; set; } =
+            UsabilityListSortingMode.MountingPlaceThenDesignation;
 
         [Category("Размеры")]
         public double TITLE_HEIGHT
@@ -162,8 +178,11 @@ namespace CT.Epladdin.PPReportHelper
             OriginY = 20.0;
 
             ApplyDefaultSettings();
-            InitializeDefaultColumns();
+            RestoreSortingByFromBlockName(block.Name);
             RestoreStateFromBlock(block);
+            RefreshCurrentPropertiesFromBlockGraphics();
+            RefreshOriginFromBlockLocation();
+            InitializeDefaultColumns();
         }
 
         internal void SetData(
@@ -180,6 +199,21 @@ namespace CT.Epladdin.PPReportHelper
                 return _dictionary != null &&
                        _dictionary.Count > 0;
             }
+        }
+
+        internal void RefreshOriginFromBlockGeometry()
+        {
+            TryUpdateOriginFromBlockGeometry(_block);
+        }
+
+        internal void RefreshCurrentPropertiesFromBlockGraphics()
+        {
+            TryUpdateVisualSettingsFromBlockGraphics(_block);
+        }
+
+        internal void RefreshOriginFromBlockLocation()
+        {
+            TryUpdateOriginFromBlockLocation(_block);
         }
 
         internal bool TryReloadDataFromActivePage()
@@ -238,6 +272,13 @@ namespace CT.Epladdin.PPReportHelper
                 return;
             }
 
+            /*
+             * Для уже размещённой таблицы координаты берём с Block.Location.
+             * Это координата верхнего левого угла блока в EPLAN и она надёжнее,
+             * чем попытка восстановить абсолютное положение по SubPlacements.
+             */
+            TryUpdateOriginFromBlockLocation(_block);
+
             NormalizeVisualSettings();
             InitializeDefaultColumns();
 
@@ -246,20 +287,48 @@ namespace CT.Epladdin.PPReportHelper
 
             using (SafetyPoint safetyPoint = SafetyPoint.Create())
             {
-                RemovePreviousGraphics();
+                /*
+                 * Важно:
+                 * старый блок удаляем только после успешного создания нового.
+                 * Иначе любая ошибка в CreateTablePlacements / Block.Create
+                 * физически удаляет существующую таблицу.
+                 */
+                Block oldBlock =
+                    _block;
 
                 List<Placement> placements =
                     CreateTablePlacements(rows);
 
-                _block =
+                if (placements == null || placements.Count == 0)
+                {
+                    WriteSystemMessage(
+                        "UsabilityList render aborted: no placements were created. Previous table was not removed.");
+
+                    return;
+                }
+
+                Block newBlock =
                     new Block();
 
-                _block.Create(
+                newBlock.Create(
                     _ownerPage,
                     placements.ToArray());
 
-                _block.Name =
-                    TableMarkerPrefix + Guid.NewGuid().ToString("N");
+                newBlock.Name =
+                    BuildBlockName();
+
+                if (!newBlock.IsValid)
+                {
+                    WriteSystemMessage(
+                        "UsabilityList render aborted: new block was not created. Previous table was not removed.");
+
+                    return;
+                }
+
+                _block =
+                    newBlock;
+
+                RemoveBlockGraphics(oldBlock);
 
                 safetyPoint.Commit();
             }
@@ -347,6 +416,49 @@ namespace CT.Epladdin.PPReportHelper
                        StringComparison.Ordinal);
         }
 
+        private string BuildBlockName()
+        {
+            return string.Concat(
+                TableMarkerPrefix,
+                "SORT=",
+                SortingBy.ToString(),
+                "#",
+                Guid.NewGuid().ToString("N"));
+        }
+
+        private void RestoreSortingByFromBlockName(
+            string blockName)
+        {
+            if (string.IsNullOrWhiteSpace(blockName))
+            {
+                return;
+            }
+
+            int sortIndex =
+                blockName.IndexOf(
+                    "SORT=",
+                    StringComparison.Ordinal);
+
+            if (sortIndex < 0)
+            {
+                return;
+            }
+
+            string value =
+                blockName.Substring(sortIndex + "SORT=".Length);
+
+            int separatorIndex =
+                value.IndexOf('#');
+
+            if (separatorIndex >= 0)
+            {
+                value =
+                    value.Substring(0, separatorIndex);
+            }
+
+            RestoreSortingByFromState(value);
+        }
+
         private void ApplyDefaultSettings()
         {
             UsabilityListSettings settings =
@@ -405,22 +517,50 @@ namespace CT.Epladdin.PPReportHelper
         private IReadOnlyList<UsabilityListRow> BuildRows(
             DetachedStructureSegmentDictionary dictionary)
         {
+            List<UsabilityListRowSource> rowSources =
+                CreateRowSources(dictionary);
+
+            if (rowSources.Count == 0)
+            {
+                return new List<UsabilityListRow>
+                {
+                    UsabilityListRow.CreatePlaceholder(
+                        "Нет данных для отображения")
+                };
+            }
+
             List<UsabilityListRow> rows =
                 new List<UsabilityListRow>();
 
-            if (dictionary == null || dictionary.Count == 0)
-            {
-                rows.Add(
-                    UsabilityListRow.CreatePlaceholder(
-                        "Нет данных для отображения"));
-
-                return rows;
-            }
-
             int rowNumber = 1;
 
-            foreach (KeyValuePair<string, List<DetachedStructureSegment>> pair
-                     in dictionary.OrderBy(item => item.Key ?? string.Empty))
+            foreach (UsabilityListRowSource rowSource in SortRowSources(rowSources))
+            {
+                rows.Add(
+                    new UsabilityListRow(
+                        rowNumber,
+                        rowSource.Segment.Designation44004,
+                        rowSource.Segment.MountingPlace1220,
+                        rowSource.Description));
+
+                rowNumber++;
+            }
+
+            return rows;
+        }
+
+        private static List<UsabilityListRowSource> CreateRowSources(
+            DetachedStructureSegmentDictionary dictionary)
+        {
+            List<UsabilityListRowSource> result =
+                new List<UsabilityListRowSource>();
+
+            if (dictionary == null || dictionary.Count == 0)
+            {
+                return result;
+            }
+
+            foreach (KeyValuePair<string, List<DetachedStructureSegment>> pair in dictionary)
             {
                 string description =
                     DetachedStructureSegmentDictionary.NormalizeDescription(pair.Key);
@@ -428,30 +568,61 @@ namespace CT.Epladdin.PPReportHelper
                 List<DetachedStructureSegment> segments =
                     pair.Value ?? new List<DetachedStructureSegment>();
 
-                foreach (DetachedStructureSegment segment
-                         in segments
-                             .OrderBy(item => item.MountingPlace1220 ?? string.Empty)
-                             .ThenBy(item => item.Designation44004 ?? string.Empty))
+                foreach (DetachedStructureSegment segment in segments)
                 {
-                    rows.Add(
-                        new UsabilityListRow(
-                            rowNumber,
-                            segment.Designation44004,
-                            segment.MountingPlace1220,
-                            description));
+                    if (segment == null)
+                    {
+                        continue;
+                    }
 
-                    rowNumber++;
+                    result.Add(
+                        new UsabilityListRowSource(
+                            description,
+                            segment));
                 }
             }
 
-            if (rows.Count == 0)
+            return result;
+        }
+
+        private IEnumerable<UsabilityListRowSource> SortRowSources(
+            IEnumerable<UsabilityListRowSource> rowSources)
+        {
+            if (rowSources == null)
             {
-                rows.Add(
-                    UsabilityListRow.CreatePlaceholder(
-                        "Нет данных для отображения"));
+                return new List<UsabilityListRowSource>();
             }
 
-            return rows;
+            switch (SortingBy)
+            {
+                case UsabilityListSortingMode.DesignationThenMountingPlace:
+                    return rowSources
+                        .OrderBy(item => item.Segment.Designation44004 ?? string.Empty)
+                        .ThenBy(item => item.Segment.MountingPlace1220 ?? string.Empty)
+                        .ThenBy(item => item.Description ?? string.Empty);
+
+                case UsabilityListSortingMode.DescriptionThenMountingPlaceThenDesignation:
+                    return rowSources
+                        .OrderBy(item => item.Description ?? string.Empty)
+                        .ThenBy(item => item.Segment.MountingPlace1220 ?? string.Empty)
+                        .ThenBy(item => item.Segment.Designation44004 ?? string.Empty);
+
+                case UsabilityListSortingMode.DescriptionThenDesignationThenMountingPlace:
+                    return rowSources
+                        .OrderBy(item => item.Description ?? string.Empty)
+                        .ThenBy(item => item.Segment.Designation44004 ?? string.Empty)
+                        .ThenBy(item => item.Segment.MountingPlace1220 ?? string.Empty);
+
+                case UsabilityListSortingMode.None:
+                    return rowSources;
+
+                case UsabilityListSortingMode.MountingPlaceThenDesignation:
+                default:
+                    return rowSources
+                        .OrderBy(item => item.Segment.MountingPlace1220 ?? string.Empty)
+                        .ThenBy(item => item.Segment.Designation44004 ?? string.Empty)
+                        .ThenBy(item => item.Description ?? string.Empty);
+            }
         }
 
         private List<Placement> CreateTablePlacements(
@@ -623,9 +794,12 @@ namespace CT.Epladdin.PPReportHelper
             Text graphicText =
                 new Text();
 
+            string displayText =
+                NormalizeTableText(text);
+
             graphicText.Create(
                 _ownerPage,
-                text ?? string.Empty,
+                displayText,
                 height);
 
             graphicText.Location =
@@ -715,7 +889,7 @@ namespace CT.Epladdin.PPReportHelper
             stateText.Create(
                 _ownerPage,
                 StateTextPrefix + SerializeState(),
-                0.0);
+                1.0);
 
             stateText.Location =
                 new PointD(OriginX, OriginY);
@@ -734,7 +908,7 @@ namespace CT.Epladdin.PPReportHelper
                     OriginX = OriginX,
                     OriginY = OriginY,
 
-                    Title = Title,
+                    Title = NormalizeTableText(Title),
 
                     TitleHeight = TitleHeight,
                     HeaderHeight = HeaderHeight,
@@ -742,17 +916,26 @@ namespace CT.Epladdin.PPReportHelper
                     TextHeight = TextHeight,
                     LineWidth = LineWidth,
 
-                    NumberHeader = NUMBER_HEADER,
-                    DesignationHeader = DESIGNATION_HEADER,
-                    MountingPlaceHeader = MOUNTING_PLACE_HEADER,
-                    DescriptionHeader = DESCRIPTION_HEADER,
+                    NumberHeader = NormalizeTableText(NUMBER_HEADER),
+                    DesignationHeader = NormalizeTableText(DESIGNATION_HEADER),
+                    MountingPlaceHeader = NormalizeTableText(MOUNTING_PLACE_HEADER),
+                    DescriptionHeader = NormalizeTableText(DESCRIPTION_HEADER),
 
                     NumberColumnWidth = NUMBER_COLUMN_WIDTH,
                     DesignationColumnWidth = DESIGNATION_COLUMN_WIDTH,
                     MountingPlaceColumnWidth = MOUNTING_PLACE_COLUMN_WIDTH,
                     DescriptionColumnWidth = DESCRIPTION_COLUMN_WIDTH,
 
-                    DataGroups = CreateStateDataGroups()
+                    SortingBy = this.SortingBy.ToString(),
+
+                    /*
+                     * Данные таблицы не пишем в скрытый Text.
+                     * В реальных проектах JSON с DataGroups может стать слишком длинным,
+                     * EPLAN начинает его резать / портить, и последующее чтение состояния
+                     * падает целиком. Данные при открытии свойств пересобираются seeker-ом
+                     * с активной страницы, а здесь храним только компактные визуальные свойства.
+                     */
+                    DataGroups = null
                 };
 
             DataContractJsonSerializer serializer =
@@ -796,7 +979,10 @@ namespace CT.Epladdin.PPReportHelper
                     OriginX = state.OriginX;
                     OriginY = state.OriginY;
 
-                    Title = state.Title ?? Title;
+                    Title =
+                        NormalizeTableTextOrDefault(
+                            state.Title,
+                            Title);
 
                     if (state.TitleHeight > 0.0)
                     {
@@ -824,16 +1010,24 @@ namespace CT.Epladdin.PPReportHelper
                     }
 
                     NUMBER_HEADER =
-                        state.NumberHeader ?? NUMBER_HEADER;
+                        NormalizeTableTextOrDefault(
+                            state.NumberHeader,
+                            NUMBER_HEADER);
 
                     DESIGNATION_HEADER =
-                        state.DesignationHeader ?? DESIGNATION_HEADER;
+                        NormalizeTableTextOrDefault(
+                            state.DesignationHeader,
+                            DESIGNATION_HEADER);
 
                     MOUNTING_PLACE_HEADER =
-                        state.MountingPlaceHeader ?? MOUNTING_PLACE_HEADER;
+                        NormalizeTableTextOrDefault(
+                            state.MountingPlaceHeader,
+                            MOUNTING_PLACE_HEADER);
 
                     DESCRIPTION_HEADER =
-                        state.DescriptionHeader ?? DESCRIPTION_HEADER;
+                        NormalizeTableTextOrDefault(
+                            state.DescriptionHeader,
+                            DESCRIPTION_HEADER);
 
                     if (state.NumberColumnWidth > 0.0)
                     {
@@ -859,6 +1053,7 @@ namespace CT.Epladdin.PPReportHelper
                             state.DescriptionColumnWidth;
                     }
 
+                    RestoreSortingByFromState(state.SortingBy);
                     RestoreDictionaryFromState(state.DataGroups);
                 }
             }
@@ -869,6 +1064,29 @@ namespace CT.Epladdin.PPReportHelper
             }
         }
 
+
+        private void RestoreSortingByFromState(
+            string sortingBy)
+        {
+            if (string.IsNullOrWhiteSpace(sortingBy))
+            {
+                return;
+            }
+
+            try
+            {
+                SortingBy =
+                    (UsabilityListSortingMode)Enum.Parse(
+                        typeof(UsabilityListSortingMode),
+                        sortingBy,
+                        true);
+            }
+            catch
+            {
+                SortingBy =
+                    UsabilityListSortingMode.MountingPlaceThenDesignation;
+            }
+        }
 
         private List<UsabilityListStateDataGroup> CreateStateDataGroups()
         {
@@ -1036,6 +1254,46 @@ namespace CT.Epladdin.PPReportHelper
             return value;
         }
 
+        private string NormalizeTableText(
+            string value)
+        {
+            Project project =
+                GetOwnerProject();
+
+            return MultiLangStringTextExtractor.GetProjectLanguageTextFromSerializedString(
+                value,
+                project);
+        }
+
+        private string NormalizeTableTextOrDefault(
+            string value,
+            string defaultValue)
+        {
+            string normalizedValue =
+                NormalizeTableText(value);
+
+            return string.IsNullOrWhiteSpace(normalizedValue)
+                ? defaultValue ?? string.Empty
+                : normalizedValue;
+        }
+
+        private Project GetOwnerProject()
+        {
+            try
+            {
+                if (_ownerPage == null || !_ownerPage.IsValid)
+                {
+                    return null;
+                }
+
+                return _ownerPage.Project;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private void RestoreStateFromBlock(
             Block block)
         {
@@ -1055,31 +1313,26 @@ namespace CT.Epladdin.PPReportHelper
             foreach (Text text in subPlacements.OfType<Text>())
             {
                 string contents =
-                    string.Empty;
-
-                try
-                {
-                    contents =
-                        text.Contents.GetAsString();
-                }
-                catch
-                {
-                    continue;
-                }
+                    GetTextContents(text);
 
                 if (string.IsNullOrWhiteSpace(contents))
                 {
                     continue;
                 }
 
-                if (!contents.StartsWith(
+                int statePrefixIndex =
+                    contents.IndexOf(
                         StateTextPrefix,
-                        StringComparison.Ordinal))
+                        StringComparison.Ordinal);
+
+                if (statePrefixIndex < 0)
                 {
                     continue;
                 }
 
-                RestoreStateFromString(contents);
+                RestoreStateFromString(
+                    contents.Substring(statePrefixIndex));
+
                 return;
             }
         }
@@ -1092,15 +1345,18 @@ namespace CT.Epladdin.PPReportHelper
                 return;
             }
 
-            if (!state.StartsWith(
+            int statePrefixIndex =
+                state.IndexOf(
                     StateTextPrefix,
-                    StringComparison.Ordinal))
+                    StringComparison.Ordinal);
+
+            if (statePrefixIndex < 0)
             {
                 return;
             }
 
             string raw =
-                state.Substring(StateTextPrefix.Length);
+                state.Substring(statePrefixIndex + StateTextPrefix.Length);
 
             if (string.IsNullOrWhiteSpace(raw))
             {
@@ -1110,17 +1366,572 @@ namespace CT.Epladdin.PPReportHelper
             DeserializeState(raw);
         }
 
-        private void RemovePreviousGraphics()
+        private bool TryUpdateOriginFromBlockGeometry(
+            Block block)
         {
-            if (_block == null || !_block.IsValid)
+            if (TryUpdateOriginFromBlockLocation(block))
+            {
+                return true;
+            }
+
+            return TryUpdateVisualSettingsFromBlockGraphics(block);
+        }
+
+        private bool TryUpdateOriginFromBlockLocation(
+            Block block)
+        {
+            if (block == null || !block.IsValid)
+            {
+                return false;
+            }
+
+            try
+            {
+                PointD location =
+                    block.Location;
+
+                OriginX = location.X;
+                OriginY = location.Y;
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool TryUpdateVisualSettingsFromBlockGraphics(
+            Block block)
+        {
+            if (block == null || !block.IsValid)
+            {
+                return false;
+            }
+
+            Placement[] subPlacements =
+                block.SubPlacements;
+
+            if (subPlacements == null || subPlacements.Length == 0)
+            {
+                return false;
+            }
+
+            List<double> verticalGridX =
+                new List<double>();
+
+            List<double> horizontalGridY =
+                new List<double>();
+
+            List<Text> visibleTexts =
+                new List<Text>();
+
+            foreach (Placement placement in subPlacements)
+            {
+                if (placement == null || !placement.IsValid)
+                {
+                    continue;
+                }
+
+                Line line =
+                    placement as Line;
+
+                if (line != null)
+                {
+                    CollectGridLineCoordinates(
+                        line,
+                        verticalGridX,
+                        horizontalGridY);
+
+                    TryRestoreLineWidthFromLine(line);
+                    continue;
+                }
+
+                Text text =
+                    placement as Text;
+
+                if (text != null && !IsStateText(text))
+                {
+                    visibleTexts.Add(text);
+                    TryRestoreTextHeightFromText(text);
+                }
+            }
+
+            verticalGridX =
+                NormalizeDistinctSortedValues(
+                    verticalGridX,
+                    ascending: true);
+
+            horizontalGridY =
+                NormalizeDistinctSortedValues(
+                    horizontalGridY,
+                    ascending: false);
+
+            if (verticalGridX.Count < 2 ||
+                horizontalGridY.Count < 2)
+            {
+                return false;
+            }
+
+            bool originRestoredFromBlockLocation =
+                TryUpdateOriginFromBlockLocation(block);
+
+            if (!originRestoredFromBlockLocation)
+            {
+                OriginX =
+                    verticalGridX[0];
+
+                OriginY =
+                    horizontalGridY[0];
+            }
+
+            RestoreColumnWidthsFromGrid(verticalGridX);
+            RestoreRowHeightsFromGrid(horizontalGridY);
+            RestoreHeadersFromTextGeometry(
+                visibleTexts,
+                verticalGridX,
+                horizontalGridY);
+
+            return true;
+        }
+
+        private void CollectGridLineCoordinates(
+            Line line,
+            List<double> verticalGridX,
+            List<double> horizontalGridY)
+        {
+            const double tolerance = 0.001;
+
+            PointD startPoint =
+                line.StartPoint;
+
+            PointD endPoint =
+                line.EndPoint;
+
+            bool isVertical =
+                Math.Abs(startPoint.X - endPoint.X) <= tolerance &&
+                Math.Abs(startPoint.Y - endPoint.Y) > tolerance;
+
+            if (isVertical)
+            {
+                verticalGridX.Add(startPoint.X);
+                return;
+            }
+
+            bool isHorizontal =
+                Math.Abs(startPoint.Y - endPoint.Y) <= tolerance &&
+                Math.Abs(startPoint.X - endPoint.X) > tolerance;
+
+            if (isHorizontal)
+            {
+                horizontalGridY.Add(startPoint.Y);
+            }
+        }
+
+        private static List<double> NormalizeDistinctSortedValues(
+            IEnumerable<double> values,
+            bool ascending)
+        {
+            const double tolerance = 0.001;
+
+            List<double> sortedValues =
+                values
+                    .OrderBy(value => value)
+                    .ToList();
+
+            List<double> result =
+                new List<double>();
+
+            foreach (double value in sortedValues)
+            {
+                if (result.Count == 0 ||
+                    Math.Abs(result[result.Count - 1] - value) > tolerance)
+                {
+                    result.Add(value);
+                }
+            }
+
+            if (!ascending)
+            {
+                result.Reverse();
+            }
+
+            return result;
+        }
+
+        private void RestoreColumnWidthsFromGrid(
+            List<double> verticalGridX)
+        {
+            if (verticalGridX == null || verticalGridX.Count < 5)
             {
                 return;
             }
 
-            Placement[] oldPlacements =
-                _block.BreakUp();
+            NUMBER_COLUMN_WIDTH =
+                verticalGridX[1] - verticalGridX[0];
 
-            _block = null;
+            DESIGNATION_COLUMN_WIDTH =
+                verticalGridX[2] - verticalGridX[1];
+
+            MOUNTING_PLACE_COLUMN_WIDTH =
+                verticalGridX[3] - verticalGridX[2];
+
+            DESCRIPTION_COLUMN_WIDTH =
+                verticalGridX[4] - verticalGridX[3];
+        }
+
+        private void RestoreRowHeightsFromGrid(
+            List<double> horizontalGridY)
+        {
+            if (horizontalGridY == null || horizontalGridY.Count < 2)
+            {
+                return;
+            }
+
+            double headerHeight =
+                horizontalGridY[0] - horizontalGridY[1];
+
+            if (headerHeight > 0.0)
+            {
+                HeaderHeight =
+                    headerHeight;
+            }
+
+            if (horizontalGridY.Count < 3)
+            {
+                return;
+            }
+
+            List<double> rowHeights =
+                new List<double>();
+
+            for (int index = 1; index < horizontalGridY.Count - 1; index++)
+            {
+                double rowHeight =
+                    horizontalGridY[index] - horizontalGridY[index + 1];
+
+                if (rowHeight > 0.0)
+                {
+                    rowHeights.Add(rowHeight);
+                }
+            }
+
+            if (rowHeights.Count > 0)
+            {
+                RowHeight =
+                    rowHeights.Average();
+            }
+        }
+
+        private void RestoreHeadersFromTextGeometry(
+            List<Text> texts,
+            List<double> verticalGridX,
+            List<double> horizontalGridY)
+        {
+            if (texts == null ||
+                verticalGridX == null || verticalGridX.Count < 5 ||
+                horizontalGridY == null || horizontalGridY.Count < 2)
+            {
+                return;
+            }
+
+            double top =
+                horizontalGridY[0];
+
+            double headerBottom =
+                horizontalGridY[1];
+
+            List<Text> headerTexts =
+                texts
+                    .Where(text => text != null && text.IsValid)
+                    .Where(text =>
+                        text.Location.Y <= top + 0.001 &&
+                        text.Location.Y >= headerBottom - 0.001)
+                    .OrderBy(text => text.Location.X)
+                    .ToList();
+
+            for (int columnIndex = 0; columnIndex < 4; columnIndex++)
+            {
+                double left =
+                    verticalGridX[columnIndex];
+
+                double right =
+                    verticalGridX[columnIndex + 1];
+
+                Text headerText =
+                    headerTexts
+                        .FirstOrDefault(text =>
+                            text.Location.X >= left - 0.001 &&
+                            text.Location.X <= right + 0.001);
+
+                if (headerText == null)
+                {
+                    continue;
+                }
+
+                string header =
+                    GetTextContents(headerText);
+
+                if (string.IsNullOrWhiteSpace(header))
+                {
+                    continue;
+                }
+
+                SetHeaderByColumnIndex(
+                    columnIndex,
+                    header);
+            }
+        }
+
+        private void SetHeaderByColumnIndex(
+            int columnIndex,
+            string header)
+        {
+            string normalizedHeader =
+                NormalizeTableText(header);
+
+            if (string.IsNullOrWhiteSpace(normalizedHeader))
+            {
+                return;
+            }
+
+            switch (columnIndex)
+            {
+                case 0:
+                    NUMBER_HEADER = normalizedHeader;
+                    break;
+
+                case 1:
+                    DESIGNATION_HEADER = normalizedHeader;
+                    break;
+
+                case 2:
+                    MOUNTING_PLACE_HEADER = normalizedHeader;
+                    break;
+
+                case 3:
+                    DESCRIPTION_HEADER = normalizedHeader;
+                    break;
+            }
+        }
+
+        private void TryRestoreLineWidthFromLine(
+            Line line)
+        {
+            if (line == null || !line.IsValid)
+            {
+                return;
+            }
+
+            try
+            {
+                if (line.Pen.Width > 0.0)
+                {
+                    LineWidth =
+                        line.Pen.Width;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void TryRestoreTextHeightFromText(
+            Text text)
+        {
+            double value;
+
+            if (TryGetPublicPropertyAsDouble(text, "Height", out value) ||
+                TryGetPublicPropertyAsDouble(text, "TextHeight", out value) ||
+                TryGetPublicPropertyAsDouble(text, "Size", out value))
+            {
+                if (value > 0.0)
+                {
+                    TextHeight =
+                        value;
+                }
+            }
+        }
+
+        private static bool TryGetPublicPropertyAsDouble(
+            object source,
+            string propertyName,
+            out double value)
+        {
+            value = 0.0;
+
+            if (source == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                PropertyInfo property =
+                    source.GetType().GetProperty(propertyName);
+
+                if (property == null)
+                {
+                    return false;
+                }
+
+                object rawValue =
+                    property.GetValue(source, null);
+
+                if (rawValue == null)
+                {
+                    return false;
+                }
+
+                if (rawValue is double)
+                {
+                    value =
+                        (double)rawValue;
+
+                    return true;
+                }
+
+                string text =
+                    Convert.ToString(rawValue, CultureInfo.InvariantCulture);
+
+                return double.TryParse(
+                    text,
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out value);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void AddPointToBounds(
+            PointD point,
+            ref bool hasPoint,
+            ref double minX,
+            ref double maxY)
+        {
+            if (!hasPoint)
+            {
+                minX = point.X;
+                maxY = point.Y;
+                hasPoint = true;
+                return;
+            }
+
+            if (point.X < minX)
+            {
+                minX = point.X;
+            }
+
+            if (point.Y > maxY)
+            {
+                maxY = point.Y;
+            }
+        }
+
+        private static bool IsStateText(
+            Text text)
+        {
+            string contents =
+                GetTextContents(text);
+
+            return !string.IsNullOrWhiteSpace(contents) &&
+                   contents.IndexOf(
+                       StateTextPrefix,
+                       StringComparison.Ordinal) >= 0;
+        }
+
+        private static string GetTextContents(
+            Text text)
+        {
+            if (text == null || !text.IsValid)
+            {
+                return string.Empty;
+            }
+
+            Project project =
+                TryGetTextProject(text);
+
+            try
+            {
+                return MultiLangStringTextExtractor.GetProjectLanguageText(
+                    text.Contents,
+                    project);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                return MultiLangStringTextExtractor.GetProjectLanguageTextFromSerializedString(
+                    text.Contents.GetAsString(),
+                    project);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static Project TryGetTextProject(
+            Text text)
+        {
+            if (text == null || !text.IsValid)
+            {
+                return null;
+            }
+
+            try
+            {
+                Page page =
+                    text.Page;
+
+                if (page == null || !page.IsValid)
+                {
+                    return null;
+                }
+
+                return page.Project;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void RemovePreviousGraphics()
+        {
+            Block block =
+                _block;
+
+            _block =
+                null;
+
+            RemoveBlockGraphics(block);
+        }
+
+        private static void RemoveBlockGraphics(
+            Block block)
+        {
+            if (block == null || !block.IsValid)
+            {
+                return;
+            }
+
+            Placement[] oldPlacements;
+
+            try
+            {
+                oldPlacements =
+                    block.BreakUp();
+            }
+            catch
+            {
+                return;
+            }
 
             if (oldPlacements == null)
             {
@@ -1129,18 +1940,24 @@ namespace CT.Epladdin.PPReportHelper
 
             foreach (Placement placement in oldPlacements)
             {
-                if (placement == null || !placement.IsValid)
-                {
-                    continue;
-                }
+                SafeRemovePlacement(placement);
+            }
+        }
 
-                try
-                {
-                    placement.Remove();
-                }
-                catch
-                {
-                }
+        private static void SafeRemovePlacement(
+            Placement placement)
+        {
+            if (placement == null || !placement.IsValid)
+            {
+                return;
+            }
+
+            try
+            {
+                placement.Remove();
+            }
+            catch
+            {
             }
         }
 
@@ -1448,6 +2265,20 @@ namespace CT.Epladdin.PPReportHelper
             }
         }
 
+        private sealed class UsabilityListRowSource
+        {
+            internal string Description { get; private set; }
+            internal DetachedStructureSegment Segment { get; private set; }
+
+            internal UsabilityListRowSource(
+                string description,
+                DetachedStructureSegment segment)
+            {
+                Description = description ?? string.Empty;
+                Segment = segment;
+            }
+        }
+
         [DataContract]
         private sealed class UsabilityListState
         {
@@ -1498,6 +2329,9 @@ namespace CT.Epladdin.PPReportHelper
 
             [DataMember]
             public double DescriptionColumnWidth { get; set; }
+
+            [DataMember]
+            public string SortingBy { get; set; }
 
             [DataMember]
             public List<UsabilityListStateDataGroup> DataGroups { get; set; }

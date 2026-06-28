@@ -80,6 +80,13 @@ namespace CT.Epladdin.PPReportHelper
                 return;
             }
 
+            /*
+             * Не вызываем RefreshCurrentPropertiesFromBlockGraphics() перед Render().
+             * Иначе только что изменённые значения из PropertyGrid перезаписываются
+             * старыми значениями, прочитанными с размещённой таблицы.
+             * Обновляем только позицию блока.
+             */
+            list.RefreshOriginFromBlockLocation();
             list.Render();
 
             EplAction redrawAction =
