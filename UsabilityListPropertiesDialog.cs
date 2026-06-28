@@ -68,6 +68,18 @@ namespace CT.Epladdin.PPReportHelper
                 return;
             }
 
+            if (!list.HasData &&
+                !list.TryReloadDataFromActivePage())
+            {
+                MessageBox.Show(
+                    "Не удалось получить данные для таблицы применимости. Таблица не будет перерисована.",
+                    "Таблица применимости",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
             list.Render();
 
             EplAction redrawAction =

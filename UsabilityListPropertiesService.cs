@@ -21,6 +21,11 @@ namespace CT.Epladdin.PPReportHelper
             UsabilityList list =
                 new UsabilityList(block);
 
+            if (!list.HasData)
+            {
+                list.TryReloadDataFromActivePage();
+            }
+
             UsabilityListPropertiesDialog.ShowModal(list);
 
             return true;
